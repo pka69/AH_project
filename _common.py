@@ -75,7 +75,7 @@ class Common_df(ABC):
         return obj.report_success()
     
 class CommonData(Common_df):
-    def __init__(self,  dir, def_dict, mapping_df,year, period, mask, ext, name='CommonData_abstract', msg=['', '']) -> None:
+    def __init__(self,  dir, def_dict, mapping_df,year, period, mask, ext, name='CommonData_abstract', msg=['', ''], **kwargs) -> None:
         super().__init__(name, msg)
         self.mapping_df = mapping_df
         self.def_dict = def_dict
@@ -87,6 +87,8 @@ class CommonData(Common_df):
         self.YTD = False
         self.compare_df = None
         self.df = pd.DataFrame(columns=def_dict['columns_name'])
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
     @classmethod
     def filter(cls, origin, column, value):
@@ -109,20 +111,20 @@ class CommonData(Common_df):
         new_obj.name = new_obj.name + '[{} = {}]'.format(column, value)
         return new_obj.report_success()
 
-    def export_to_file(self, output_dir='', prefix='', ext='csv', export_df = None):
+    def export_to_file(self, output_dir='', prefix='', ext='csv', export_df = pd.DataFrame()):
         xls_ext = ['xls', 'xlm', 'xlsx', 'xlsm']
         if not output_dir:
             output_dir = self.OUTPUT_DIR
-        export_file_name = '{}-{}{}{} P{} - {}.{}'.format(prefix, output_dir, self.year, self.YTD, self.period, self.name, ext)
-        if not export_df:
+        export_file_name = '{}{}{}{} P{} - compare {}.{}'.format(output_dir, prefix, self.year, 'YTD' if self.YTD else '', self.period, self.name, ext)
+        if export_df.empty:
             export_df = self.df
         comment = 'file {} succesfully exported.'.format(export_file_name)
         success = True
         try:
             if ext in xls_ext:
-                self.db.to_excel(export_file_name, index=False)
+                export_df.to_excel(export_file_name, index=False)
             else:
-                self.db.to_csv(export_file_name, index=False)
+                export_df.to_csv(export_file_name, index=False)
         except Exception as e:
             success = False
             comment = 'file {} export failed: {}.'.format(export_file_name, str(e))
@@ -130,13 +132,16 @@ class CommonData(Common_df):
     
     def sum_values(self):
         values = self.df[self.float_cols].sum().tolist()
-        return ', '.format('{}: {:,.f}'.format(col, value) for col, value in zip(self.float_cols, values))
+        return ', '.join(['{}: {:,.2f}'.format(col, value) for col, value in zip(self.float_cols, values)])
 class ComparedData(CommonData):
+    def initial_process(self):
+        pass
+
     @classmethod
     def create_compared(cls, source_obj, name):
         new_obj = cls(
             dir='',
-            def_dict=[],
+            def_dict=source_obj.def_dict,
             mapping_df=None,
             year=source_obj.year,
             period=source_obj.period,
@@ -144,6 +149,8 @@ class ComparedData(CommonData):
             ext='',
             name=name
         )
+        new_obj.def_dict=[]
+        new_obj.YTD = source_obj.YTD
         new_obj.df = source_obj.compare_df
         new_obj.msg = ['compared {} failed,'.format(new_obj.name), 'compared {} created succesfully.'.format(new_obj.name)]
         new_obj.create_float_values_attr()

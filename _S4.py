@@ -152,7 +152,7 @@ class DataS4(CommonData, ProcessingMixIn):
             [self.mapping_df.mapping, full_scope, {'df': self.df, 'on': 'ACC_ID'}],
             [self.mapping_df.check_mapping, full_scope, {'df': self.df, 'col': 'GCAD_ID'}],
             [change_nan_in_columns, True, {'df': self.df, 'columns': ['FUNC_AREA', 'PROFIT_CTR', 'STORE_DEPT', 'INTERCO']}], 
-            [del_zero_value_rows, True, {'df': self.df, 'column': 'S4_VALUE','limit': self.limit}],
+            [del_zero_value_rows, True, {'df': self.df, 'column': 'S4_VALUE', 'limit': self.limit}],
         ]
         self._run_processes(processes, "load_period {}/{} data for entity {} ".format(self.year, curr_period, self.entity_id))
         return self.status, 'loading period {}/{} data for entity {} '.format(self.year, curr_period, self.entity_id) + 'completed' if self.status else 'failure', self.df

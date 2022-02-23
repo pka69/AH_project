@@ -1,12 +1,12 @@
 import pandas as pd
 
-from ._common import ProcessingMixin, CommonData, ComparedData
+from ._common import ProcessingMixIn, CommonData, ComparedData
 from .df_manipulation import import_data
 from .tools import file_list, status_dict
 
 
 
-class DataEPM(CommonData, ProcessingMixin):
+class DataEPM(CommonData, ProcessingMixIn):
     def __init__(self, def_dict, mapping_df, dir, year, period, mask='CC', ext='txt') -> None:
         super().__init__(dir, def_dict, mapping_df, year, period, mask, ext, name="EPM_data", msg=['EPM Entity data failure: ', 'EPM Entity data completed'])
         self.df = pd.DataFrame(columns=self.def_dict['columns_name'])
@@ -71,14 +71,19 @@ class DataEPM(CommonData, ProcessingMixin):
             return self.status, "EPM GCAD mapping failure: {}".format(e), self.df
         return self.status, 'GCAD mapping added. Total EPM_VALUE={:,.2f}. No of records: {:5,}'.format(self.df['EPM_VALUE'].sum(), self.df['EPM_VALUE'].count()), self.df
     
-    def compare_with_BPC(self, bpc_obj, output_dir='', ext='xlsx', 
-                        EPM_group_by = ['EPM_ENTITY', 'GCAD_ID', 'ACC_GROUP','MOVEMENT_TYPE', 'EPM_VALUE'],
-                        BPC_group_by = ['EPM_ENTITY', 'GCAD_ID', 'ACC_GROUP','MOVEMENT_TYPE', 'BPC_VALUE']
+    def compare_with_BPC(self, comp_obj, output_dir='', ext='xlsx', 
+                        left_group_by = ['EPM_ENTITY', 'GCAD_ID', 'ACC_GROUP','MOVEMENT_TYPE', 'EPM_VALUE'],
+                        right_group_by = ['EPM_ENTITY', 'GCAD_ID', 'ACC_GROUP','MOVEMENT_TYPE', 'BPC_VALUE']
     ):
         self.compare_df = pd.concat([
-            self.df[EPM_group_by].groupby(EPM_group_by[:-1]).sum(), 
-            bpc_obj.df[BPC_group_by].groupby(BPC_group_by[:-1]).sum()]
+            self.df[left_group_by].groupby(left_group_by[:-1]).sum(), 
+            comp_obj.df[right_group_by].groupby(right_group_by[:-1]).sum()]
             , join='outer', axis=1, 
         ).reset_index()
-        _, _, compare_obj = ComparedData.create_compared(self, self.name + ' with BPC')
-        return compare_obj.export_to_file(output_dir=output_dir, prefix=bpc_obj.name, ext=ext, df=self.compare_df)
+        self.compare_df['empty'] = (self.compare_df['BPC_VALUE'].isnull() | self.compare_df['S4_VALUE'].isnull())
+        self.compare_df['BPC_VALUE'] = self.compare_df['BPC_VALUE'].fillna(0)
+        self.compare_df['EPM_VALUE'] = self.compare_df['EPM_VALUE'].fillna(0)
+        self.compare_df['Diff_VALUE'] = self.compare_df['EPM_VALUE'].round(2) - self.compare_df['BPC_VALUE'].round(2)
+        _, _, compare_obj = self.wraper(ComparedData.create_compared)(self, self.name + ' with ' + comp_obj.name)
+        status, comment, _ = self.wraper(compare_obj.export_to_file)(output_dir=output_dir, ext=ext, export_df=self.compare_df)
+        return status, comment, compare_obj

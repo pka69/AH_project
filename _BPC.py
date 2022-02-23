@@ -1,13 +1,13 @@
 import pandas as pd
 
-from ._common import ProcessingMixin, CommonData, ComparedData
+from ._common import ProcessingMixIn, CommonData, ComparedData
 from .df_manipulation import import_data_csv, del_zero_value_rows
 from .tools import file_list, status_dict
 
 
-class DataBPC(CommonData, ProcessingMixin):
+class DataBPC(CommonData, ProcessingMixIn):
     def __init__(self, def_dict, mapping_df, dir, year, period, mask='CC', ext='txt') -> None:
-        super().__init__(dir, def_dict, mapping_df, year, period, mask, ext, name="BPM_data", msg=['BPC Entity data failure: ', 'BPC Entity data completed'])
+        super().__init__(dir, def_dict, mapping_df, year, period, mask, ext, name="BPC_data", msg=['BPC Entity data failure: ', 'BPC Entity data completed'])
         self.df = pd.DataFrame(columns=self.def_dict['columns_name'])
         self.YTD = True
 
@@ -50,7 +50,7 @@ class DataBPC(CommonData, ProcessingMixin):
             # [self.mapping_df[0].check_mapping, True, {'df': self.df, 'col': 'EPM_ENTITY'}],
             [self.mapping_df[1].mapping, True, {'df': self.df, 'on': 'ACC_ID'}],
             [self.mapping_df[1].check_mapping, True, {'df': self.df, 'col': 'GCAD_ID'}],
-            [del_zero_value_rows, True, {'df': self.df, 'column': 'BPC_VALUE'}],
+            [del_zero_value_rows, True, {'df': self.df, 'column': 'BPC_VALUE', 'limit': self.limit}],
             [self.movement_mapping_processing, True, {}],
         ]
 
@@ -72,6 +72,8 @@ class DataBPC(CommonData, ProcessingMixin):
 
         self._run_processes(processes, 'Compare BPC with S4 ')
         if self.status:
+            status, comment, compare_obj = self.wraper(ComparedData.create_compared)(self, self.name + ' with ' + entity_obj.name)
+            status, comment, _ = self.wraper(compare_obj.export_to_file)(output_dir=output_dir, ext=ext, export_df=self.compare_df)
             comment = "Period {}/{}, entity {} comparison between S4 and BPC completed".format(self.year, self.period, entity_obj.entity_id)
             return self.status, comment, self.compare_df
         else:
@@ -98,23 +100,23 @@ class DataBPC(CommonData, ProcessingMixin):
         S4_sum = entity_obj['S4_VALUE'].sum()
         return True, 'entity {}. BPC value sum: $ {:,.2f}, S4 value sum: $ {:,.2f}'.format(entity_obj.entity_id, BPC_sum, S4_sum)
     
-    def create_compare_df(self, entity_obj):
+    def create_compare_df(self, comp_obj, output_dir='', ext='csv'):
         self.compare_df = pd.concat([
             self.selected_df.groupby(
                 self.BPC_S4_compare_fields).sum(), 
-            entity_obj[self.BPC_S4_compare_fields + ['S4_VALUE']].groupby(
+            comp_obj[self.BPC_S4_compare_fields + ['S4_VALUE']].groupby(
                 self.BPC_S4_compare_fields).sum()
             ], join='outer', axis=1, 
         ).reset_index()
         self.compare_df['empty'] = (self.compare_df['BPC_VALUE'].isnull() | self.compare_df['S4_VALUE'].isnull())
         self.compare_df['BPC_VALUE'] = self.compare_df['BPC_VALUE'].fillna(0)
         self.compare_df['S4_VALUE'] = self.compare_df['S4_VALUE'].fillna(0)
-        self.compare_df['Diff'] = self.compare_df['BPC_VALUE'].round(2) - self.compare_df['S4_VALUE'].round(2)
+        self.compare_df['Diff_VALUE'] = self.compare_df['BPC_VALUE'].round(2) - self.compare_df['S4_VALUE'].round(2)
         # compare_df['empty'] = (compare_df['BPC_VALUE'].isnull() | compare_df['S4_VALUE'].isnull())
         # del(self.selected_df)
         # return True, 'merge file values: BPC: $ {:,.2f}, S4: $ {:,.2f}'.format(self.compare_df['BPC_VALUE'].sum(), self.compare_df['S4_VALUE'].sum()), self.df
         _, _, compare_obj = ComparedData.create_compared(self, self.name + ' with S4')
-        return compare_obj.export_to_file(output_dir=output_dir, prefix=bpc_obj.name, ext=ext, df=self.compare_df)
+        return compare_obj.export_to_file(output_dir=output_dir, prefix=comp_obj.name, ext=ext, df=self.compare_df)
     
     def create_output_file(self, prefix, ext, output_dir):
         return self.export_to_file(output_dir=output_dir, prefix=prefix, ext=ext, df=self.compare_df )
