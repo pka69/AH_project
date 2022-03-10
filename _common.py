@@ -47,10 +47,11 @@ class Common_df(ABC):
         pass
     
     def report_success(self):
-        if self.status:
-            comment = f'{self.name}: {self.msg[self.status]}, ' + ','.join([f'{item} = {self.df[item].sum():,.2f}' for item in self.float_cols]) if self.float_cols else ''
-        else:
-            comment = f'{self.name}: {self.msg[self.status]}. '
+        comment = f'{self.name}: {self.msg[self.status]}, '
+        if self.status and self.float_cols:
+            comment = comment + ','.join(
+                [f'{item} = {self.df[item].sum():,.2f}' for item in self.float_cols]
+            )
         return self.status, comment, self
     
     def __call__(self):
@@ -63,7 +64,7 @@ class Common_df(ABC):
         columns = [item for item in self.df.columns if item.endswith('_VALUE')]
         dataTypeSeries = self.df.dtypes
         
-        for idx, item in enumerate(columns):
+        for item in columns:
             if dataTypeSeries[item] == float:
                 self.float_cols.append(item)
     
@@ -108,7 +109,7 @@ class CommonData(Common_df):
             setattr(new_obj, attr, getattr(origin, attr))
         new_obj.df = origin.df[origin.df[column]==value]
         new_obj.msg = ['filtered ' + item for item in new_obj.msg]
-        new_obj.name = new_obj.name + '[{} = {}]'.format(column, value)
+        new_obj.name = new_obj.name + '({} = {})'.format(column, value)
         return new_obj.report_success()
 
     def export_to_file(self, output_dir='', prefix='', ext='csv', export_df = pd.DataFrame()):
@@ -133,6 +134,13 @@ class CommonData(Common_df):
     def sum_values(self):
         values = self.df[self.float_cols].sum().tolist()
         return ', '.join(['{}: {:,.2f}'.format(col, value) for col, value in zip(self.float_cols, values)])
+    
+    def sum_sel_values(self, cols):
+        values = self.df[cols].sum().tolist()
+        return ', '.join(['{}: {:,.2f}'.format(col, value) for col, value in zip(cols, values)])
+    
+    def data_summary(self, cols = None):
+        return True, self.sum_sel_values(cols) if cols else self.sum_values(), self.df
 class ComparedData(CommonData):
     def initial_process(self):
         pass
@@ -181,6 +189,7 @@ class MappingData(Common_df):
                             'int32': 'Int32',
                         }
                         df[item].astype(int_types_conv[str(self.df[item].dtypes)])
+            self.status, comment, df = self.wraper(self.fill_no_match)(df)
             if self.float_cols:
                 self.status, comment = True, '{} mapping added. Total {}={:,.2f}. No of records: {:,5}'.format(
                     on if on else left_on, self.float_cols[-1], self.df[self.float_cols[-1]].sum(), self.df[self.float_cols[-1]].count())
@@ -190,11 +199,20 @@ class MappingData(Common_df):
             self.status, comment = False, self.msg[0] + '{}'.format(e)
         return self.status, comment, df
     
-    def check_mapping(self, df, col):
+    def fill_no_match(self, df):
+        df_cols = df.columns.tolist()
+        for col in self.mapping_columns:
+            # print('col: {}, puste: {}'.format(col, sum(df[col].isnull())))
+            if col in df_cols: df[col] = df[col].fillna('{}-no match'.format(self.name))
+        return True, 'null values in columns {} filled in'.format(self.mapping_columns), df
+    
+    def check_mapping(self, df, col, no_mapping_action=None):
         self.status, comment = True, 'GCAD mapping checked completness'
-        no_mapping = df[col].isnull().sum()
+        no_mapping = df[col].str.contains('no match').sum()
         if no_mapping:
             # self.status = False
-            comment = '{} accounts are out of mapping in entity file "{}". Check it!'.format(no_mapping, df['file_sheet'][0])
+            if no_mapping_action:
+                self.wraper(no_mapping_action)(col)
+            comment = '{} records out of mapping in data file "{}". Check it!'.format(no_mapping, df['file_sheet'][0])
         return self.status, comment, df
     

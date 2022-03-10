@@ -118,6 +118,19 @@ def import_data(def_dict, source_dir='', df = None, na_filter=True, clean_by_col
         comment = 'import data from excel file {} completed'.format(f_name)
     return status, comment, output
 
-
+def compare_values(df1, df2, cols, check_col):
+    cols_list = set(df1[cols].groupby(cols).count().index.tolist())
+    cols_list = cols_list | set(df2[cols].groupby(cols).count().index.tolist())
+    cols_list = list(cols_list)
+    output_df = pd.DataFrame(columns=cols + ['df1', 'df2'])
+    for item in cols_list:
+        s1 = df1[df1[cols] == item][cols + [check_col]].groupby(cols).sum()
+        s1 = 0 if s1.empty else s1[check_col].tolist()[0]
+        s2 = df2[df2[cols] == item][cols + [check_col]].groupby(cols).sum()
+        s2 = 0 if s2.empty else s2[check_col].tolist()[0]
+        
+        if abs(s1-s2)>0.001:
+            output_df.append(item + [s1, s2])
+    return output_df
 
 

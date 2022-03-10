@@ -1,7 +1,7 @@
 import pandas as pd
 
 from ._common import ProcessingMixIn, CommonData, ComparedData
-from .df_manipulation import import_data
+from .df_manipulation import import_data, compare_values
 from .tools import file_list, status_dict
 
 
@@ -32,7 +32,7 @@ class DataEPM(CommonData, ProcessingMixIn):
         if self.files_list:
             self.status, comment = True, 'imported, splited and sorted {} EPM files completed'.format(len(self.files_list))
         else:
-            self.status, comment = False, 'no files matched with mask "{}"'.format(mask)
+            self.status, comment = False, 'no files matched with mask "{}"'.format(self.mask)
         return self.status, comment, self.files_list
 
     def _get_period(self):
@@ -65,6 +65,7 @@ class DataEPM(CommonData, ProcessingMixIn):
                 self.mapping_df.df[self.mapping_df.df['ACC_GROUP']!='ALLC'][['GCAD_ID', 'ACC_GROUP', 'ACC_ID']].groupby(
                     ['GCAD_ID', 'ACC_GROUP']).count().reset_index(), 
                     how = 'left', on='GCAD_ID' )
+            _, _, self.df = self.mapping_df.fill_no_match(self.df)
             self.df.drop('ACC_ID', axis='columns', inplace=True)
         except Exception as e:
             self.status = False
@@ -75,15 +76,25 @@ class DataEPM(CommonData, ProcessingMixIn):
                         left_group_by = ['EPM_ENTITY', 'GCAD_ID', 'ACC_GROUP','MOVEMENT_TYPE', 'EPM_VALUE'],
                         right_group_by = ['EPM_ENTITY', 'GCAD_ID', 'ACC_GROUP','MOVEMENT_TYPE', 'BPC_VALUE']
     ):
+        report_df = pd.DataFrame({'Source': [self.name]} | {item: [self.df[item].sum()] for item in self.float_cols})
+        report_df =report_df.append(pd.DataFrame({'Source': [comp_obj.name]} | {item: [comp_obj.df[item].sum()] for item in comp_obj.float_cols}), ignore_index=True)
         self.compare_df = pd.concat([
             self.df[left_group_by].groupby(left_group_by[:-1]).sum(), 
             comp_obj.df[right_group_by].groupby(right_group_by[:-1]).sum()]
             , join='outer', axis=1, 
         ).reset_index()
-        self.compare_df['empty'] = (self.compare_df['BPC_VALUE'].isnull() | self.compare_df['S4_VALUE'].isnull())
+        test = pd.merge(
+            self.df[left_group_by].groupby(left_group_by[:-1]).sum().reset_index(), 
+            comp_obj.df[right_group_by].groupby(right_group_by[:-1]).sum().reset_index(),
+            how='outer', left_on=left_group_by[:-1], right_on=right_group_by[:-1]
+        )
+        # compare_values(self.df, self.compare_df, left_group_by[:-1], left_group_by[-1])
+        self.compare_df['empty'] = (self.compare_df['BPC_VALUE'].isnull() | self.compare_df['EPM_VALUE'].isnull())
         self.compare_df['BPC_VALUE'] = self.compare_df['BPC_VALUE'].fillna(0)
         self.compare_df['EPM_VALUE'] = self.compare_df['EPM_VALUE'].fillna(0)
         self.compare_df['Diff_VALUE'] = self.compare_df['EPM_VALUE'].round(2) - self.compare_df['BPC_VALUE'].round(2)
         _, _, compare_obj = self.wraper(ComparedData.create_compared)(self, self.name + ' with ' + comp_obj.name)
+        report_df =report_df.append(pd.DataFrame({'Source': [compare_obj.name]} | {item: [compare_obj.df[item].sum()] for item in compare_obj.float_cols}))
         status, comment, _ = self.wraper(compare_obj.export_to_file)(output_dir=output_dir, ext=ext, export_df=self.compare_df)
+        
         return status, comment, compare_obj

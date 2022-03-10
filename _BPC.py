@@ -46,8 +46,10 @@ class DataBPC(CommonData, ProcessingMixIn):
     def load_data(self):
         processes = [
             [import_data_csv, True, {'def_dict': self.def_dict, 'df': self.df, 'file':self.files_list[0][-1]}],
+            [self.data_summary, True, {'cols': ['BPC_VALUE']}],
             [self.mapping_df[0].mapping, True, {'df': self.df, 'left_on': 'ENTITY', 'right_on': 'ID'}],
-            # [self.mapping_df[0].check_mapping, True, {'df': self.df, 'col': 'EPM_ENTITY'}],
+            [self.mapping_df[0].check_mapping, True, {'df': self.df, 'col': 'EPM_ENTITY', 
+                                                      'no_mapping_action': self.no_entity_mapping_action}],
             [self.mapping_df[1].mapping, True, {'df': self.df, 'on': 'ACC_ID'}],
             [self.mapping_df[1].check_mapping, True, {'df': self.df, 'col': 'GCAD_ID'}],
             [del_zero_value_rows, True, {'df': self.df, 'column': 'BPC_VALUE', 'limit': self.limit}],
@@ -57,6 +59,16 @@ class DataBPC(CommonData, ProcessingMixIn):
         self._run_processes(processes, "BPC load_YTD {}/{} data ".format(self.year, self.period))
         return self.status, 'BPC loading YTD {}/{} data '.format(self.year, self.period) + 'completed' if self.status else 'failure', self.df
 
+    def no_entity_mapping_action(self, col):
+        output_file = self.OUTPUT_DIR + 'BPC_not_mapped_Entities.xlsx'
+        self.df[
+            self.df[col].isnull()][
+                ['ENTITY','BPC_VALUE' ]
+            ].groupby('ENTITY').agg(
+                ['sum', 'min', 'max', 'count']
+            ).to_excel(output_file)
+        return True, "not mapped Entities listed in file: {}".format(output_file), self.df
+        
     def compare_with_entity(self, entity_obj, output_dir='', ext='csv'):
         if not output_dir:
             output_dir = self.OUTPUT_DIR
@@ -94,13 +106,15 @@ class DataBPC(CommonData, ProcessingMixIn):
             self.status = False
             comment = "no BPC rows for entity {}".format(entity_id)
         return self.status, comment, self.df
-    
+
     def check_values(self, entity_obj):
         BPC_sum = self.selected_df['BPC_VALUE'].sum()
         S4_sum = entity_obj['S4_VALUE'].sum()
         return True, 'entity {}. BPC value sum: $ {:,.2f}, S4 value sum: $ {:,.2f}'.format(entity_obj.entity_id, BPC_sum, S4_sum)
     
     def create_compare_df(self, comp_obj, output_dir='', ext='csv'):
+        report_df = pd.DataFrame({'Source': self.name} | {item: self.df[item].sum() for item in self.float_cols})
+        report_df.append(pd.DataFrame({'Source': comp_obj.name} | {item: comp_obj.df[item].sum() for item in comp_obj.float_cols}))
         self.compare_df = pd.concat([
             self.selected_df.groupby(
                 self.BPC_S4_compare_fields).sum(), 
@@ -116,6 +130,8 @@ class DataBPC(CommonData, ProcessingMixIn):
         # del(self.selected_df)
         # return True, 'merge file values: BPC: $ {:,.2f}, S4: $ {:,.2f}'.format(self.compare_df['BPC_VALUE'].sum(), self.compare_df['S4_VALUE'].sum()), self.df
         _, _, compare_obj = ComparedData.create_compared(self, self.name + ' with S4')
+        report_df.append(pd.DataFrame({'Source': compare_obj.name} | {item: compare_obj.df[item].sum() for item in compare_obj.float_cols}))
+        
         return compare_obj.export_to_file(output_dir=output_dir, prefix=comp_obj.name, ext=ext, df=self.compare_df)
     
     def create_output_file(self, prefix, ext, output_dir):
@@ -143,5 +159,7 @@ class DataBPC(CommonData, ProcessingMixIn):
         return FUNC_AREA_MAPPING.get(item, '[None]')
 
     def movement_mapping_processing(self):
-        self.df.loc[:,'MOVEMENT_TYPE'] = self.df.loc[:,'FUNC_AREA'].apply(self.movement_mapping)
+        # self.df.loc[:,'MOVEMENT_TYPE'] = self.df.loc[:,'FUNC_AREA'].apply(self.movement_mapping)
+        # self.df.loc[:, 'MOVEMENT_TYPE'] = self.df['FUNC_AREA'].apply(self.movement_mapping)
+        self.df['MOVEMENT_TYPE'] = self.df['FUNC_AREA'].apply(self.movement_mapping)
         return self.status, "Added MOVEMENT_TYPE column. Records with no numbers: {:,}.".format((self.df['MOVEMENT_TYPE']=='[None]').sum()), self.df
