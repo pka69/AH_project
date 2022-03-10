@@ -170,8 +170,8 @@ class DataBPC(CommonData, ProcessingMixIn):
         return FLOW_MAPPING.get(item, '[None]')
     
     def movement_mapping_processing(self):
-        # self.df.loc[:,'MOVEMENT_TYPE'] = self.df.loc[:,'FUNC_AREA'].apply(self.movement_mapping_FUNC_AREA)
+        self.df.loc[:,'MOVEMENT_TYPE'] = self.df.loc[:,'FUNC_AREA'].apply(self.movement_mapping_FUNC_AREA)
         # self.df.loc[:, 'MOVEMENT_TYPE'] = self.df['FUNC_AREA'].apply(self.movement_mapping_FUNC_AREA)
-        self.df['MOVEMENT_TYPE'] = self.df['FUNC_AREA'].apply(self.movement_mapping_FUNC_AREA)
+        # self.df['MOVEMENT_TYPE'] = self.df['FUNC_AREA'].apply(self.movement_mapping_FUNC_AREA)
         self.df.loc[self.df['MOVEMENT_TYPE']=='[None]','MOVEMENT_TYPE'] = self.df.loc[self.df['MOVEMENT_TYPE']=='[None]','FLOW'].apply(self.movement_mapping_FLOW)
         return self.status, "Added MOVEMENT_TYPE column. Records with no numbers: {:,}.".format((self.df['MOVEMENT_TYPE']=='[None]').sum()), self.df

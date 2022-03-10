@@ -93,8 +93,8 @@ class DataEPM(CommonData, ProcessingMixIn):
         self.compare_df['BPC_VALUE'] = self.compare_df['BPC_VALUE'].fillna(0)
         self.compare_df['EPM_VALUE'] = self.compare_df['EPM_VALUE'].fillna(0)
         self.compare_df['Diff_VALUE'] = self.compare_df['EPM_VALUE'].round(2) - self.compare_df['BPC_VALUE'].round(2)
-        _, _, compare_obj = self.wraper(ComparedData.create_compared)(self, self.name + ' with ' + comp_obj.name)
+        status, comment, compare_obj = self.wraper(ComparedData.create_compared)(self, self.name + ' with ' + comp_obj.name)
         # report_df =report_df.append(pd.DataFrame({'Source': [compare_obj.name]} | {item: [compare_obj.df[item].sum()] for item in compare_obj.float_cols}))
-        status, comment, _ = self.wraper(compare_obj.export_to_file)(output_dir=output_dir, ext=ext, export_df=self.compare_df)
+        # status, comment, _ = self.wraper(compare_obj.export_to_file)(output_dir=output_dir, ext=ext, export_df=self.compare_df)
         
         return status, comment, compare_obj
