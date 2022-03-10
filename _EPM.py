@@ -76,25 +76,25 @@ class DataEPM(CommonData, ProcessingMixIn):
                         left_group_by = ['EPM_ENTITY', 'GCAD_ID', 'ACC_GROUP','MOVEMENT_TYPE', 'EPM_VALUE'],
                         right_group_by = ['EPM_ENTITY', 'GCAD_ID', 'ACC_GROUP','MOVEMENT_TYPE', 'BPC_VALUE']
     ):
-        report_df = pd.DataFrame({'Source': [self.name]} | {item: [self.df[item].sum()] for item in self.float_cols})
-        report_df =report_df.append(pd.DataFrame({'Source': [comp_obj.name]} | {item: [comp_obj.df[item].sum()] for item in comp_obj.float_cols}), ignore_index=True)
+        # report_df = pd.DataFrame({'Source': [self.name]} | {item: [self.df[item].sum()] for item in self.float_cols})
+        # report_df =report_df.append(pd.DataFrame({'Source': [comp_obj.name]} | {item: [comp_obj.df[item].sum()] for item in comp_obj.float_cols}), ignore_index=True)
         self.compare_df = pd.concat([
             self.df[left_group_by].groupby(left_group_by[:-1]).sum(), 
             comp_obj.df[right_group_by].groupby(right_group_by[:-1]).sum()]
             , join='outer', axis=1, 
         ).reset_index()
-        test = pd.merge(
-            self.df[left_group_by].groupby(left_group_by[:-1]).sum().reset_index(), 
-            comp_obj.df[right_group_by].groupby(right_group_by[:-1]).sum().reset_index(),
-            how='outer', left_on=left_group_by[:-1], right_on=right_group_by[:-1]
-        )
+        # test = pd.merge(
+        #     self.df[left_group_by].groupby(left_group_by[:-1]).sum().reset_index(), 
+        #     comp_obj.df[right_group_by].groupby(right_group_by[:-1]).sum().reset_index(),
+        #     how='outer', left_on=left_group_by[:-1], right_on=right_group_by[:-1]
+        # )
         # compare_values(self.df, self.compare_df, left_group_by[:-1], left_group_by[-1])
         self.compare_df['empty'] = (self.compare_df['BPC_VALUE'].isnull() | self.compare_df['EPM_VALUE'].isnull())
         self.compare_df['BPC_VALUE'] = self.compare_df['BPC_VALUE'].fillna(0)
         self.compare_df['EPM_VALUE'] = self.compare_df['EPM_VALUE'].fillna(0)
         self.compare_df['Diff_VALUE'] = self.compare_df['EPM_VALUE'].round(2) - self.compare_df['BPC_VALUE'].round(2)
         _, _, compare_obj = self.wraper(ComparedData.create_compared)(self, self.name + ' with ' + comp_obj.name)
-        report_df =report_df.append(pd.DataFrame({'Source': [compare_obj.name]} | {item: [compare_obj.df[item].sum()] for item in compare_obj.float_cols}))
+        # report_df =report_df.append(pd.DataFrame({'Source': [compare_obj.name]} | {item: [compare_obj.df[item].sum()] for item in compare_obj.float_cols}))
         status, comment, _ = self.wraper(compare_obj.export_to_file)(output_dir=output_dir, ext=ext, export_df=self.compare_df)
         
         return status, comment, compare_obj

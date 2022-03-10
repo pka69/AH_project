@@ -147,7 +147,7 @@ class DataBPC(CommonData, ProcessingMixIn):
         return self.status, "S4 and BPC (year={}, period={}) consistency checked".format(self.year, self.period), self.df
     
     @staticmethod
-    def movement_mapping(item):
+    def movement_mapping_FUNC_AREA(item):
         FUNC_AREA_MAPPING = {
             'AD01': 'O_OWNST',
             'AD02': 'L_OWNST',
@@ -157,9 +157,21 @@ class DataBPC(CommonData, ProcessingMixIn):
             'AD06': 'NONREC',
         }
         return FUNC_AREA_MAPPING.get(item, '[None]')
-
+    
+    @staticmethod
+    def  movement_mapping_FLOW(item):
+        FLOW_MAPPING = {
+            'Z13': 'MS054',
+            'Z21': 'MS078',
+            'Z24': 'MS088',
+            '100': 'MS000', 
+            '120': 'MS015',
+        }
+        return FLOW_MAPPING.get(item, '[None]')
+    
     def movement_mapping_processing(self):
-        # self.df.loc[:,'MOVEMENT_TYPE'] = self.df.loc[:,'FUNC_AREA'].apply(self.movement_mapping)
-        # self.df.loc[:, 'MOVEMENT_TYPE'] = self.df['FUNC_AREA'].apply(self.movement_mapping)
-        self.df['MOVEMENT_TYPE'] = self.df['FUNC_AREA'].apply(self.movement_mapping)
+        # self.df.loc[:,'MOVEMENT_TYPE'] = self.df.loc[:,'FUNC_AREA'].apply(self.movement_mapping_FUNC_AREA)
+        # self.df.loc[:, 'MOVEMENT_TYPE'] = self.df['FUNC_AREA'].apply(self.movement_mapping_FUNC_AREA)
+        self.df['MOVEMENT_TYPE'] = self.df['FUNC_AREA'].apply(self.movement_mapping_FUNC_AREA)
+        self.df.loc[self.df['MOVEMENT_TYPE']=='[None]','MOVEMENT_TYPE'] = self.df.loc[self.df['MOVEMENT_TYPE']=='[None]','FLOW'].apply(self.movement_mapping_FLOW)
         return self.status, "Added MOVEMENT_TYPE column. Records with no numbers: {:,}.".format((self.df['MOVEMENT_TYPE']=='[None]').sum()), self.df
