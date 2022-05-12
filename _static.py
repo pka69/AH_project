@@ -53,7 +53,7 @@ ENTITIES_YTDFORMAT = {
 BPC_FORMAT = {
     'columns_name': ['ACC_ID', 'AUDITTRAIL', 'CATEGORY', 'CHANNEL', 'ENTITY', 'FLOW','FUNC_AREA', 'GROUPS', 
                      'INTERCO', 'PROFIT_CTR', 'LC_CURRENCY', 'STORE_DEPT', 'TIME', 'BPC_VALUE'],
-    'columns_types':[np.int32, str, str, str, str, np.int16, str, str, str, str, str, str, str, float],
+    'columns_types':[np.int32, str, str, str, str, str, str, str, str, str, str, str, str, float],  # np.int16
     'start_data_row': 2,
     
 }

@@ -40,13 +40,16 @@ def change_columns_type(df, types):
     status, comment = True, 'columns types changed completed'
     if types:
         columns = df.columns[:len(types)]
-        try:
-            for id, col in enumerate(columns):
-                df[col] = df[col].astype(types[id], errors='ignore')
-        except Exception as E:
-            status, comment = False, 'column {} conversion failed to {}: {}'.format(col, types[id], E)
-        if types[id] == str:
-            df[col] = df[col].str.strip()
+        for id, col in enumerate(columns):
+            try:
+                if types[id] != str and type(df[col][0]) == str:
+                    df[col] = df[col].str.replace(' ','')
+                    df[col] = df[col].fillna(0)
+                df[col] = df[col].astype(types[id])  # , errors='ignore'
+            except Exception as E:
+                status, comment = False, 'column {} conversion failed to {}: {}'.format(col, types[id], E)
+            if types[id] == str:
+                df[col] = df[col].str.strip()
     return status, comment, df
 
 def import_data_csv(def_dict, file, df=None, source_dir =''):

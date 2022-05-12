@@ -31,6 +31,14 @@ class DataBPC(CommonData, ProcessingMixIn):
         return self.status, comment, self.df
     
     def _get_period(self):
+        for idx, file_name in enumerate(self.files_list):
+            try:
+                year = int(file_name.split('/')[-1].split('.')[0].split('_')[2])
+                period = int(file_name.split('/')[-1].split('.')[0].split('_')[1][1:])
+                self.files_list[idx] = [year, period, file_name]
+            except Exception:
+                self.status = False
+        return
         def split_BPC_period(s):
             year, period = s.split('.')
             year = int(year)
